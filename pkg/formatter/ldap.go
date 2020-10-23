@@ -14,14 +14,14 @@ import (
 
 // LDAPAttribute represents an LDAP attribute.
 type LDAPAttribute struct {
-	Name   string
-	Values []string
+	Name   string   `json:"name"`
+	Values []string `json:"values"`
 }
 
 // LDAPEntry represents an LDAP entry.
 type LDAPEntry struct {
-	DistinguishedName string
-	Attributes        []LDAPAttribute
+	DistinguishedName string          `json:"distinguishedName"`
+	Attributes        []LDAPAttribute `json:"attributes"`
 }
 
 // LDAPFormatters is a list of registered formatters.
@@ -71,15 +71,18 @@ func LDAPFormatterText(resp *ldap.SearchResult) ([]byte, error) {
 
 	buf := bytes.Buffer{}
 
-	for _, e := range entries {
-		buf.WriteString(fmt.Sprintln(e.DistinguishedName))
+	for i, e := range entries {
+		buf.WriteString(fmt.Sprintf("Distinguished Name: %s\n", e.DistinguishedName))
 		buf.WriteString(fmt.Sprintln("Attributes:"))
 
 		for _, attr := range e.Attributes {
 			buf.WriteString(fmt.Sprintf("  %s: %s\n", attr.Name, strings.Join(attr.Values, "; ")))
 		}
 
-		buf.WriteString("\n")
+		// only add newline character if there are more entries to print
+		if i < len(entries)-1 {
+			buf.WriteString("\n")
+		}
 	}
 
 	return buf.Bytes(), nil
