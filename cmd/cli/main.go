@@ -23,6 +23,23 @@ var rootCmd = &cobra.Command{
 	Short: "direktorcli is used to search objects in LDAP/Active Directory",
 }
 
+var loginCmd = &cobra.Command{
+	Use:   "login",
+	Short: "Login creates a state file with login information for convenience.",
+	Run: func(cmd *cobra.Command, args []string) {
+		conf := getConfig(cmd)
+		cli, err := ldapcli.Dial(conf)
+		if err != nil {
+			fatal(err.Error())
+		}
+		cli.Close()
+
+		if err := viper.WriteConfig(); err != nil {
+			fatal(fmt.Sprintf("unable to write state: %s\n", err))
+		}
+	},
+}
+
 var searchCmd = &cobra.Command{
 	Use:   "search <filter>",
 	Short: "Search using LDAP filter",
@@ -33,6 +50,7 @@ var searchCmd = &cobra.Command{
 		if err != nil {
 			fatal(err.Error())
 		}
+		defer cli.Close()
 
 		attributes, _ := cmd.Flags().GetStringSlice("attributes")
 		if len(attributes) == 0 {
@@ -103,10 +121,6 @@ func getConfig(cmd *cobra.Command) *ldapcli.Config {
 		fmt.Print("\n")
 	}
 
-	if err := viper.WriteConfig(); err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("WARN: unable to write state: %s\n", err))
-	}
-
 	return conf
 }
 
@@ -121,7 +135,7 @@ func init() {
 	searchCmd.Flags().StringSlice("attributes", []string{}, "Comma-separated list of attributes to return")
 	searchCmd.Flags().StringP("output", "o", "text", "Output format: json, json-pretty, ldif, text, yaml")
 
-	rootCmd.AddCommand(searchCmd)
+	rootCmd.AddCommand(loginCmd, searchCmd)
 
 	homeDir, _ := os.UserHomeDir()
 	defaultConfigDir = homeDir + "/.direktor"
