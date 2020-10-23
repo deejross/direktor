@@ -13,7 +13,10 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-var defaultConfigFile = ""
+var (
+	defaultConfigDir  = ""
+	defaultConfigFile = ""
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "direktorcli",
@@ -32,6 +35,10 @@ var searchCmd = &cobra.Command{
 		}
 
 		attributes, _ := cmd.Flags().GetStringSlice("attributes")
+		if len(attributes) == 0 {
+			attributes = []string{ldapcli.AttributeCommonName, ldapcli.AttributeObjectClass}
+		}
+
 		output, _ := cmd.Flags().GetString("output")
 		req := cli.NewSearchRequest(args[0], attributes)
 		resp, err := cli.Search(req)
@@ -39,7 +46,12 @@ var searchCmd = &cobra.Command{
 			fatal(err.Error())
 		}
 
-		formatter.Format(output, resp)
+		b, err := formatter.FormatLDAPSearchResult(output, resp)
+		if err != nil {
+			fatal(err.Error())
+		}
+
+		fmt.Println(string(b))
 	},
 }
 
@@ -60,30 +72,35 @@ func getConfig(cmd *cobra.Command) *ldapcli.Config {
 		if !strings.Contains(err.Error(), "Not Found") {
 			fatal(err.Error())
 		}
+		os.Mkdir(defaultConfigDir, 0700)
 		viper.SetConfigFile(defaultConfigFile)
 	}
 
-	address, _ := cmd.Flags().GetString("address")
+	address := viper.GetString("address")
 	if len(address) == 0 {
 		fatal("no address configured")
 	} else if !strings.HasPrefix(address, "ldap") {
 		fatal("unkown address format: %s", address)
 	}
 
-	basedn, _ := cmd.Flags().GetString("basedn")
+	basedn := viper.GetString("basedn")
 	if len(basedn) == 0 {
 		basedn = ldapcli.ParseBaseDNFromDomain(address)
+		viper.Set("basedn", basedn)
 	}
 
 	conf := ldapcli.NewConfig(address, basedn)
-	conf.BindDN, _ = cmd.Flags().GetString("binddn")
-	conf.BindPassword, _ = cmd.Flags().GetString("bindpw")
-	conf.StartTLS, _ = cmd.Flags().GetBool("start-tls")
-	conf.SkipVerify, _ = cmd.Flags().GetBool("insecure")
+	conf.BindDN = viper.GetString("binddn")
+	conf.BindPassword = viper.GetString("bindpw")
+	conf.StartTLS = viper.GetBool("start-tls")
+	conf.SkipVerify = viper.GetBool("insecure")
 
 	if len(conf.BindDN) > 0 && len(conf.BindPassword) == 0 {
+		fmt.Print("Enter password: ")
 		bpw, _ := terminal.ReadPassword(int(syscall.Stdin))
 		conf.BindPassword = strings.TrimSpace(string(bpw))
+		viper.Set("bindpw", conf.BindPassword)
+		fmt.Print("\n")
 	}
 
 	if err := viper.WriteConfig(); err != nil {
@@ -106,14 +123,15 @@ func init() {
 
 	rootCmd.AddCommand(searchCmd)
 
-	defaultConfigFile, _ = os.UserHomeDir()
-	defaultConfigFile += "/.direktorcli.yaml"
+	homeDir, _ := os.UserHomeDir()
+	defaultConfigDir = homeDir + "/.direktor"
+	defaultConfigFile = defaultConfigDir + "/direktorcli.yaml"
 
-	viper.SetConfigName("cli")
+	viper.SetConfigName("direktorcli")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/direktor/")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath(defaultConfigFile)
+	viper.AddConfigPath(defaultConfigDir)
 	viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
 	viper.BindPFlag("basedn", rootCmd.PersistentFlags().Lookup("basedn"))
 	viper.BindPFlag("binddn", rootCmd.PersistentFlags().Lookup("binddn"))
