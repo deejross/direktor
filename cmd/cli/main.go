@@ -210,6 +210,10 @@ func init() {
 
 	searchCmd.Flags().StringSlice("attributes", []string{}, "Comma-separated list of attributes to return")
 	searchCmd.Flags().StringP("output", "o", "text", "Output format: json, json-pretty, ldif, text, yaml")
+	searchCmd.Flags().String("dn", "", "Find by distingushedName")
+	searchCmd.Flags().String("cn", "", "Find by common name (CN)")
+	searchCmd.Flags().String("by-attr", "", "Find by attribute, format <attribute>=<value>")
+	searchCmd.Flags().String("filter", "", "Find using LDAP filter")
 
 	membersCmd.Flags().StringSlice("attributes", []string{}, "Comma-separated list of attributes to return")
 	membersCmd.Flags().StringP("output", "o", "text", "Output format: json, json-pretty, ldif, text, yaml")
