@@ -256,7 +256,7 @@ func TestParseBaseDNFromDomain(t *testing.T) {
 	require.Equal(t, "dc=server,dc=local", ParseBaseDNFromDomain("ldap://server.local:389"))
 	require.Equal(t, "dc=server,dc=local", ParseBaseDNFromDomain("ldaps://server.local/somepath"))
 	require.Equal(t, "dc=invalid", ParseBaseDNFromDomain("invalid"))
-	require.Equal(t, "", ParseDomainFromDN(""))
+	require.Equal(t, "", ParseBaseDNFromDomain(""))
 }
 
 func handleNotFound(w ldapserver.ResponseWriter, m *ldapserver.Message) {
