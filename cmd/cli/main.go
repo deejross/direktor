@@ -107,7 +107,7 @@ func init() {
 	rootCmd.AddCommand(searchCmd)
 
 	defaultConfigFile, _ = os.UserHomeDir()
-	defaultConfigFile += "/.direktor.yaml"
+	defaultConfigFile += "/.direktorcli.yaml"
 
 	viper.SetConfigName("cli")
 	viper.SetConfigType("yaml")
