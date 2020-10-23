@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -51,7 +52,10 @@ func Get() (*Config, error) {
 }
 
 func init() {
-	viper.SetConfigName("config")
+	defaultConfigFile, _ := os.UserHomeDir()
+	defaultConfigFile += "/.direktor.yaml"
+
+	viper.SetConfigName("server")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/direktor/")
 	viper.AddConfigPath("$HOME/.direktor")

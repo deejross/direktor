@@ -1,5 +1,5 @@
 # Direktor
-A web-based GUI for viewing objects in LDAP and Active Directory.
+A web-based GUI and CLI for viewing objects in LDAP and Active Directory.
 
 ## Features
 * Supports multiple domains
@@ -13,7 +13,7 @@ The technology stack includes:
 * Vue (UI)
 
 ## Status
-**EXPIRAMENTAL** 
+**EXPERIMENTAL** 
 
 * [ ] Stable LDAP client module
 * [ ] Initial API with documentation
