@@ -8,6 +8,7 @@ import (
 
 	"github.com/deejross/direktor/pkg/formatter"
 	"github.com/deejross/direktor/pkg/ldapcli"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
@@ -27,11 +28,7 @@ var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login creates a state file with login information for convenience.",
 	Run: func(cmd *cobra.Command, args []string) {
-		conf := getConfig(cmd)
-		cli, err := ldapcli.Dial(conf)
-		if err != nil {
-			fatal(err.Error())
-		}
+		cli := getClient(cmd)
 		cli.Close()
 
 		if err := viper.WriteConfig(); err != nil {
@@ -41,29 +38,54 @@ var loginCmd = &cobra.Command{
 }
 
 var searchCmd = &cobra.Command{
-	Use:   "search <filter>",
-	Short: "Search using LDAP filter",
-	Args:  cobra.ExactArgs(1),
+	Use:   "search",
+	Short: "Search directory",
 	Run: func(cmd *cobra.Command, args []string) {
-		conf := getConfig(cmd)
-		cli, err := ldapcli.Dial(conf)
+		cli := getClient(cmd)
+		defer cli.Close()
+
+		resp, err := search(cmd, cli)
 		if err != nil {
 			fatal(err.Error())
 		}
+
+		output, _ := cmd.Flags().GetString("output")
+		b, err := formatter.FormatLDAPSearchResult(output, resp)
+		if err != nil {
+			fatal(err.Error())
+		}
+
+		fmt.Println(string(b))
+	},
+}
+
+var membersCmd = &cobra.Command{
+	Use:   "members",
+	Short: "List members of a group",
+	Run: func(cmd *cobra.Command, args []string) {
+		cli := getClient(cmd)
 		defer cli.Close()
+
+		resp, err := search(cmd, cli)
+		if err != nil {
+			fatal(err.Error())
+		}
+
+		if len(resp.Entries) == 0 {
+			fatal("group not found")
+		}
 
 		attributes, _ := cmd.Flags().GetStringSlice("attributes")
 		if len(attributes) == 0 {
 			attributes = []string{ldapcli.AttributeCommonName, ldapcli.AttributeObjectClass}
 		}
 
-		output, _ := cmd.Flags().GetString("output")
-		req := cli.NewSearchRequest(args[0], attributes)
-		resp, err := cli.Search(req)
+		resp, err = cli.GroupMembersExtended(resp.Entries[0].DN, attributes...)
 		if err != nil {
 			fatal(err.Error())
 		}
 
+		output, _ := cmd.Flags().GetString("output")
 		b, err := formatter.FormatLDAPSearchResult(output, resp)
 		if err != nil {
 			fatal(err.Error())
@@ -85,7 +107,7 @@ func fatal(s string, args ...interface{}) {
 	os.Exit(1)
 }
 
-func getConfig(cmd *cobra.Command) *ldapcli.Config {
+func getClient(cmd *cobra.Command) *ldapcli.Client {
 	if err := viper.ReadInConfig(); err != nil {
 		if !strings.Contains(err.Error(), "Not Found") {
 			fatal(err.Error())
@@ -121,7 +143,61 @@ func getConfig(cmd *cobra.Command) *ldapcli.Config {
 		fmt.Print("\n")
 	}
 
-	return conf
+	cli, err := ldapcli.Dial(conf)
+	if err != nil {
+		fatal(err.Error())
+	}
+
+	return cli
+}
+
+func search(cmd *cobra.Command, cli *ldapcli.Client) (*ldap.SearchResult, error) {
+	attributes, _ := cmd.Flags().GetStringSlice("attributes")
+	if len(attributes) == 0 {
+		attributes = []string{ldapcli.AttributeCommonName, ldapcli.AttributeObjectClass}
+	}
+
+	dn, _ := cmd.Flags().GetString("dn")
+	cn, _ := cmd.Flags().GetString("cn")
+	byAttr, _ := cmd.Flags().GetString("by-attr")
+	filter, _ := cmd.Flags().GetString("filter")
+
+	if len(filter) == 0 {
+		if len(dn) > 0 {
+			if !ldapcli.IsDNSanitized(dn) {
+				return nil, fmt.Errorf("dn contains invalid characters: %s", dn)
+			}
+
+			filter = fmt.Sprintf("(distinguishedName=%s)", dn)
+		} else if len(cn) > 0 {
+			if !ldapcli.IsNameSanitized(cn) {
+				return nil, fmt.Errorf("cn contains invalid characters: %s", cn)
+			}
+
+			filter = fmt.Sprintf("(cn=%s)", cn)
+		} else if len(byAttr) > 0 {
+			if !strings.Contains(byAttr, "=") {
+				return nil, fmt.Errorf("by-attr missing value to search for: %s", byAttr)
+			}
+
+			parts := strings.SplitN(byAttr, "=", 2)
+			if !ldapcli.IsNameSanitized(parts[0]) {
+				return nil, fmt.Errorf("by-attr name contains invalid characters: %s", parts[0])
+			}
+			if !ldapcli.IsDNSanitized(parts[1]) {
+				return nil, fmt.Errorf("by-attr value contains invalid characters: %s", parts[1])
+			}
+
+			filter = fmt.Sprintf("(%s=%s)", parts[0], parts[1])
+		}
+	}
+
+	if len(filter) == 0 {
+		return nil, fmt.Errorf("search requires one of: --dn, --cn, --by-attr, --filter")
+	}
+
+	req := cli.NewSearchRequest(filter, attributes)
+	return cli.Search(req)
 }
 
 func init() {
@@ -135,7 +211,14 @@ func init() {
 	searchCmd.Flags().StringSlice("attributes", []string{}, "Comma-separated list of attributes to return")
 	searchCmd.Flags().StringP("output", "o", "text", "Output format: json, json-pretty, ldif, text, yaml")
 
-	rootCmd.AddCommand(loginCmd, searchCmd)
+	membersCmd.Flags().StringSlice("attributes", []string{}, "Comma-separated list of attributes to return")
+	membersCmd.Flags().StringP("output", "o", "text", "Output format: json, json-pretty, ldif, text, yaml")
+	membersCmd.Flags().String("dn", "", "Find by distingushedName")
+	membersCmd.Flags().String("cn", "", "Find by common name (CN)")
+	membersCmd.Flags().String("by-attr", "", "Find by attribute, format <attribute>=<value>")
+	membersCmd.Flags().String("filter", "", "Find using LDAP filter")
+
+	rootCmd.AddCommand(loginCmd, searchCmd, membersCmd)
 
 	homeDir, _ := os.UserHomeDir()
 	defaultConfigDir = homeDir + "/.direktor"
