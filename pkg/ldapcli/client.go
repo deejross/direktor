@@ -163,6 +163,11 @@ func (c *Client) Reconnect() error {
 	return nil
 }
 
+// Config returns the Config object being used.
+func (c *Client) Config() *Config {
+	return c.conf
+}
+
 // NewSearchRequest returns a new ldap.SearchRequest object with some defaults set.
 func (c *Client) NewSearchRequest(filter string, attributes []string) *ldap.SearchRequest {
 	return ldap.NewSearchRequest(

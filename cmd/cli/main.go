@@ -95,6 +95,39 @@ var membersCmd = &cobra.Command{
 	},
 }
 
+var listCmd = &cobra.Command{
+	Use:   "list <ou dn>",
+	Short: "List members of an Organizational Unit",
+	Args:  cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		cli := getClient(cmd)
+		defer cli.Close()
+
+		attributes, _ := cmd.Flags().GetStringSlice("attributes")
+		if len(attributes) == 0 {
+			attributes = []string{ldapcli.AttributeCommonName, ldapcli.AttributeObjectClass}
+		}
+
+		dn := cli.Config().BaseDN
+		if len(args) > 0 {
+			dn = args[0]
+		}
+
+		resp, err := cli.OrganizationalUnitMembers(dn, attributes...)
+		if err != nil {
+			fatal(err.Error())
+		}
+
+		output, _ := cmd.Flags().GetString("output")
+		b, err := formatter.FormatLDAPSearchResult(output, resp)
+		if err != nil {
+			fatal(err.Error())
+		}
+
+		fmt.Println(string(b))
+	},
+}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -222,7 +255,10 @@ func init() {
 	membersCmd.Flags().String("by-attr", "", "Find by attribute, format <attribute>=<value>")
 	membersCmd.Flags().String("filter", "", "Find using LDAP filter")
 
-	rootCmd.AddCommand(loginCmd, searchCmd, membersCmd)
+	listCmd.Flags().StringSlice("attributes", []string{}, "Comma-separated list of attributes to return")
+	listCmd.Flags().StringP("output", "o", "text", "Output format: json, json-pretty, ldif, text, yaml")
+
+	rootCmd.AddCommand(loginCmd, searchCmd, membersCmd, listCmd)
 
 	homeDir, _ := os.UserHomeDir()
 	defaultConfigDir = homeDir + "/.direktor"
