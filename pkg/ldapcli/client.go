@@ -126,6 +126,12 @@ func Dial(conf *Config) (*Client, error) {
 // Close the connection.
 func (c *Client) Close() {
 	c.conn.Close()
+
+	for _, conn := range c.refs {
+		conn.Close()
+	}
+
+	c.refs = map[string]*Client{}
 }
 
 // Reconnect to LDAP. This is used internally if the connection is interrupted.
@@ -166,6 +172,34 @@ func (c *Client) Reconnect() error {
 // Config returns the Config object being used.
 func (c *Client) Config() *Config {
 	return c.conf
+}
+
+// Bind will attempt to bind as the given DN and password.
+func (c *Client) Bind(userDN, password string) error {
+	if len(password) == 0 {
+		if err := c.conn.UnauthenticatedBind(userDN); err != nil {
+			return fmt.Errorf("unauthenticated bind to LDAP: %v", err)
+		}
+
+		c.conf.BindDN = userDN
+	} else if len(userDN) > 0 && len(password) > 0 {
+		if err := c.conn.Bind(userDN, password); err != nil {
+			return fmt.Errorf("binding to LDAP: %v", err)
+		}
+
+		c.conf.BindDN = userDN
+		c.conf.BindPassword = password
+	} else {
+		return fmt.Errorf("cannot bind without a user DN")
+	}
+
+	// clear out any existing referral connections using previous credentials
+	for _, conn := range c.refs {
+		conn.Close()
+	}
+
+	c.refs = map[string]*Client{}
+	return nil
 }
 
 // NewSearchRequest returns a new ldap.SearchRequest object with some defaults set.

@@ -15,7 +15,8 @@ The technology stack includes:
 ## Status
 **EXPERIMENTAL** 
 
-* [ ] Stable LDAP client module
+* [x] Stable LDAP client module
+* [x] CLI utility
 * [ ] Initial API with documentation
 * [ ] Web-based UI
 
