@@ -31,7 +31,8 @@ type Domain struct {
 
 // Config object from environment configuration.
 type Config struct {
-	Domains []*Domain
+	Domains    []*Domain // List of domains to configure
+	ListenPort string    // The port number for the server to listen on, defaults to 8000 or value of PORT environment variable
 }
 
 // Get reads in the configuration from the config file and returns a Config object.
@@ -48,23 +49,36 @@ func Get() (*Config, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, err
+	}
+
 	conf = &Config{}
 	if err := viper.Unmarshal(conf); err != nil {
 		return nil, err
+	}
+
+	// determine the ListenPort if not set in config file
+	if len(conf.ListenPort) == 0 {
+		if port := os.Getenv("PORT"); len(port) > 0 {
+			conf.ListenPort = port
+		} else {
+			conf.ListenPort = "8000"
+		}
 	}
 
 	return conf, nil
 }
 
 func init() {
-	defaultConfigFile, _ := os.UserHomeDir()
-	defaultConfigFile += "/.direktor.yaml"
+	homeDir, _ := os.UserHomeDir()
+	defaultConfigDir := homeDir + "/.direktor"
 
-	viper.SetConfigName("server")
+	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/direktor/")
-	viper.AddConfigPath("$HOME/.direktor")
 	viper.AddConfigPath(".")
+	viper.AddConfigPath(defaultConfigDir)
 	viper.WatchConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		mu.Lock()
