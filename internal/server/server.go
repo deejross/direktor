@@ -31,6 +31,9 @@ func Start() error {
 	// configure API endpoints
 	router.GET("/health", routeHealth)
 
+	// register other endpoints
+	registerRoutes(router)
+
 	// start listening
 	log.Info("listening on port " + conf.ListenPort)
 	return router.Run(":" + conf.ListenPort)
