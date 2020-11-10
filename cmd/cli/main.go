@@ -163,8 +163,8 @@ func getClient(cmd *cobra.Command) *ldapcli.Client {
 	}
 
 	conf := ldapcli.NewConfig(address, basedn)
-	conf.BindUsername = viper.GetString("binddn")
-	conf.BindPassword = viper.GetString("bindpw")
+	conf.BindUsername = viper.GetString("username")
+	conf.BindPassword = viper.GetString("password")
 	conf.StartTLS = viper.GetBool("start-tls")
 	conf.SkipVerify = viper.GetBool("insecure")
 
@@ -172,7 +172,7 @@ func getClient(cmd *cobra.Command) *ldapcli.Client {
 		fmt.Print("Enter password: ")
 		bpw, _ := terminal.ReadPassword(int(syscall.Stdin))
 		conf.BindPassword = strings.TrimSpace(string(bpw))
-		viper.Set("bindpw", conf.BindPassword)
+		viper.Set("password", conf.BindPassword)
 		fmt.Print("\n")
 	}
 
@@ -236,8 +236,8 @@ func search(cmd *cobra.Command, cli *ldapcli.Client) (*ldap.SearchResult, error)
 func init() {
 	rootCmd.PersistentFlags().StringP("address", "a", "", "Address to LDAP server in format: ldap://server.local:389 or ldaps://server.local:636")
 	rootCmd.PersistentFlags().StringP("basedn", "b", "", "BaseDN for searching, defaults to auto discovery")
-	rootCmd.PersistentFlags().StringP("binddn", "u", "", "BindDN to use for authentication")
-	rootCmd.PersistentFlags().StringP("bindpw", "p", "", "Password to use for authentication, if not set you will be prompted")
+	rootCmd.PersistentFlags().StringP("username", "u", "", "Username to use for authentication")
+	rootCmd.PersistentFlags().StringP("password", "p", "", "Password to use for authentication, if not set you will be prompted")
 	rootCmd.PersistentFlags().Bool("start-tls", false, "Start TLS")
 	rootCmd.PersistentFlags().Bool("insecure", false, "Skip TLS validation errors")
 
@@ -271,8 +271,8 @@ func init() {
 	viper.AddConfigPath(defaultConfigDir)
 	viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
 	viper.BindPFlag("basedn", rootCmd.PersistentFlags().Lookup("basedn"))
-	viper.BindPFlag("binddn", rootCmd.PersistentFlags().Lookup("binddn"))
-	viper.BindPFlag("bindpw", rootCmd.PersistentFlags().Lookup("bindpw"))
+	viper.BindPFlag("username", rootCmd.PersistentFlags().Lookup("username"))
+	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
 	viper.BindPFlag("start-tls", rootCmd.PersistentFlags().Lookup("start-tls"))
 	viper.BindPFlag("insecure", rootCmd.PersistentFlags().Lookup("insecure"))
 }
