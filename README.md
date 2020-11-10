@@ -2,6 +2,7 @@
 A web-based GUI and CLI for viewing objects in LDAP and Active Directory.
 
 ## Features
+* Works on Windows, Mac, and Linux
 * Supports multiple domains
 * Follows referrals for subdomains in a forest
 * Discovers group membership across subdomains
