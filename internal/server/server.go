@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const tokenIssuer = "direktor"
+
 var log = logger.New("internal/server")
 
 // Start the web server.
@@ -21,6 +23,15 @@ func Start() error {
 		return err
 	}
 
+	// setup the router
+	router := setupRouter()
+
+	// start listening
+	log.Info("listening on port " + conf.ListenPort)
+	return router.Run(":" + conf.ListenPort)
+}
+
+func setupRouter() *gin.Engine {
 	// configure router
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -28,15 +39,13 @@ func Start() error {
 	router.Use(gin.Recovery())
 	router.Use(static.Serve("/", static.LocalFile("./ui", true)))
 
-	// configure API endpoints
+	// configure basic endpoints
 	router.GET("/health", routeHealth)
 
 	// register other endpoints
 	registerRoutes(router)
 
-	// start listening
-	log.Info("listening on port " + conf.ListenPort)
-	return router.Run(":" + conf.ListenPort)
+	return router
 }
 
 func routeHealth(c *gin.Context) {
