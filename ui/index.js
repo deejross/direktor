@@ -41,22 +41,12 @@ window.app = new Vue({
 
             this.$vuetify.theme.dark = colorSchemeDark.matches;
         },
-        fetchDomains: function () {
-            const url = "/v1/config/domains";
-            fetch(url)
-                .then(resp => resp.json())
-                .then(data => {
-                    if (data.error) {
-                        state.error = data.error;
-                        return;
-                    }
-
-                    state.domains = data.domains;
-                })
+        loadConfig: function () {
+            // TODO: load from localStorage
         }
     },
     mounted: function () {
         this.setColorScheme();
-        this.fetchDomains();
+        this.loadConfig();
     }
 });
