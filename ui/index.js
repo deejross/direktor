@@ -1,4 +1,6 @@
 import HomePage from "./components/pages/home/index.js";
+import SearchPage from "./components/pages/search/index.js";
+import AboutPage from "./components/pages/about/index.js";
 
 const state = {
     error: undefined,
@@ -14,10 +16,21 @@ window.app = new Vue({
                 path: "/",
                 component: HomePage,
                 props: () => state
+            },
+            {
+                path: "/search",
+                component: SearchPage,
+                props: () => state
+            },
+            {
+                path: "/about",
+                component: AboutPage,
+                props: () => state
             }
         ]
     }),
     vuetify: new Vuetify({
+
     }),
     methods: {
         setColorScheme: function () {
