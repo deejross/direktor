@@ -163,12 +163,12 @@ func getClient(cmd *cobra.Command) *ldapcli.Client {
 	}
 
 	conf := ldapcli.NewConfig(address, basedn)
-	conf.BindDN = viper.GetString("binddn")
+	conf.BindUsername = viper.GetString("binddn")
 	conf.BindPassword = viper.GetString("bindpw")
 	conf.StartTLS = viper.GetBool("start-tls")
 	conf.SkipVerify = viper.GetBool("insecure")
 
-	if len(conf.BindDN) > 0 && len(conf.BindPassword) == 0 {
+	if len(conf.BindUsername) > 0 && len(conf.BindPassword) == 0 {
 		fmt.Print("Enter password: ")
 		bpw, _ := terminal.ReadPassword(int(syscall.Stdin))
 		conf.BindPassword = strings.TrimSpace(string(bpw))

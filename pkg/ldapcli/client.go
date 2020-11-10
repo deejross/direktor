@@ -45,6 +45,9 @@ const (
 	// AttributeUnicodePassword is the name of the double-quoted UTF16 encoded password attribute.
 	AttributeUnicodePassword = "unicodePwd"
 
+	// AttributeUserPrincipalName is the name of the userPrincipalName attribute.
+	AttributeUserPrincipalName = "userPrincipalName"
+
 	// ObjectClassGroup is the name of the group object class.
 	ObjectClassGroup = "group"
 
@@ -54,15 +57,16 @@ const (
 
 // Config object for client.
 type Config struct {
-	Address          string // address with ldap:// or ldaps:// protocol prefix
-	BindDN           string // optional, bind as distinguishedName
-	BindPassword     string // optional, bind with password
-	StartTLS         bool   // should the connection attempt to STARTTLS
-	SkipVerify       bool   // ignore insecure TLS validation errors
-	BaseDN           string // base DN for searching
-	PageSize         int    // the number of results to request per page, default: 1000
-	DefaultTimeLimit int    // default time limit to wait for results, default: 0 (no time limit)
-	FollowReferrals  bool   // should searches that return referrals be followed, default: true
+	Address           string // address with ldap:// or ldaps:// protocol prefix
+	BindUsername      string // optional, bind as username or userPrincipalName
+	BindPassword      string // optional, bind with password
+	StartTLS          bool   // should the connection attempt to STARTTLS
+	SkipVerify        bool   // ignore insecure TLS validation errors
+	BaseDN            string // base DN for searching
+	PageSize          int    // the number of results to request per page, default: 1000
+	DefaultTimeLimit  int    // default time limit to wait for results, default: 0 (no time limit)
+	FollowReferrals   bool   // should searches that return referrals be followed, default: true
+	userPrincipalName string // calculated userPrincipalName for binding
 }
 
 // NewConfig returns a new Config object with defaults set.
@@ -91,6 +95,7 @@ func (c *Config) Validate() error {
 		c.PageSize = 10000
 	}
 
+	c.userPrincipalName = CalculateUserPrincipalName(c.BindUsername, c.BaseDN)
 	return nil
 }
 
@@ -152,11 +157,11 @@ func (c *Client) Reconnect() error {
 	}
 
 	if len(c.conf.BindPassword) == 0 {
-		if err := conn.UnauthenticatedBind(c.conf.BindDN); err != nil {
+		if err := conn.UnauthenticatedBind(c.conf.userPrincipalName); err != nil {
 			return fmt.Errorf("unauthenticated bind to LDAP: %v", err)
 		}
-	} else if len(c.conf.BindDN) > 0 && len(c.conf.BindPassword) > 0 {
-		if err := conn.Bind(c.conf.BindDN, c.conf.BindPassword); err != nil {
+	} else if len(c.conf.userPrincipalName) > 0 && len(c.conf.BindPassword) > 0 {
+		if err := conn.Bind(c.conf.userPrincipalName, c.conf.BindPassword); err != nil {
 			return fmt.Errorf("binding to LDAP: %v", err)
 		}
 	}
@@ -175,22 +180,26 @@ func (c *Client) Config() *Config {
 }
 
 // Bind will attempt to bind as the given DN and password.
-func (c *Client) Bind(userDN, password string) error {
+func (c *Client) Bind(username, password string) error {
+	upn := CalculateUserPrincipalName(username, c.conf.BaseDN)
+
 	if len(password) == 0 {
-		if err := c.conn.UnauthenticatedBind(userDN); err != nil {
+		if err := c.conn.UnauthenticatedBind(upn); err != nil {
 			return fmt.Errorf("unauthenticated bind to LDAP: %v", err)
 		}
 
-		c.conf.BindDN = userDN
-	} else if len(userDN) > 0 && len(password) > 0 {
-		if err := c.conn.Bind(userDN, password); err != nil {
+		c.conf.BindUsername = username
+		c.conf.userPrincipalName = upn
+	} else if len(upn) > 0 && len(password) > 0 {
+		if err := c.conn.Bind(upn, password); err != nil {
 			return fmt.Errorf("binding to LDAP: %v", err)
 		}
 
-		c.conf.BindDN = userDN
+		c.conf.BindUsername = username
+		c.conf.userPrincipalName = upn
 		c.conf.BindPassword = password
 	} else {
-		return fmt.Errorf("cannot bind without a user DN")
+		return fmt.Errorf("cannot bind without a username")
 	}
 
 	// clear out any existing referral connections using previous credentials
@@ -335,7 +344,7 @@ func (c *Client) configureReferrals(referrals []string) {
 			conf := &Config{
 				Address:          fmt.Sprintf("%s://%s", u.Scheme, u.Host),
 				BaseDN:           strings.TrimSuffix(strings.TrimPrefix(u.Path, "/"), "/"),
-				BindDN:           c.conf.BindDN,
+				BindUsername:     c.conf.BindUsername,
 				BindPassword:     c.conf.BindPassword,
 				DefaultTimeLimit: c.conf.DefaultTimeLimit,
 				FollowReferrals:  false,
@@ -422,6 +431,18 @@ func ParseBaseDNFromDomain(domain string) string {
 	domain = strings.SplitN(domain, "/", 2)[0]
 
 	return fmt.Sprintf("dc=%s", strings.ReplaceAll(domain, ".", ",dc="))
+}
+
+// CalculateUserPrincipalName attempts to calculate the userPrincipalDomain of the given username.
+// If the username contains the `@` or `=` symbols, it is returned as-is. Otherwise, the domain is calculated
+// based on the BaseDN.
+func CalculateUserPrincipalName(username, baseDN string) string {
+	if len(username) == 0 || len(baseDN) == 0 || strings.Contains(username, "@") || strings.Contains(username, "=") {
+		return username
+	}
+
+	domain := ParseDomainFromDN(baseDN)
+	return fmt.Sprintf("%s@%s", username, domain)
 }
 
 // formatPassword to utf16 and wrap in double quotes.
