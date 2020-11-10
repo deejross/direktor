@@ -5,8 +5,10 @@ export default {
                 <v-card-title>Direktor</v-card-title>
                 <v-card-text>A web-based GUI and CLI for viewing objects in LDAP and Active Directory.</v-card-text>
                 <v-card-subtitle>
-                    <v-icon medium>mdi-github</v-icon>
-                    <a href="https://github.com/deejross/direktor">github.com/deejross/direktor</a>
+                    <a href="https://github.com/deejross/direktor">
+                        <v-icon medium>mdi-github</v-icon>
+                        github.com/deejross/direktor
+                    </a>
                 </v-card-subtitle>
             </v-card>
         </v-container>
